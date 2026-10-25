@@ -6,8 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+# Explicit permissions required for GitHub Pages deployments via Actions
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -25,16 +26,14 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js Environment
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+      - name: Configure GitHub Pages Routing
+        uses: actions/configure-pages@v5
 
       - name: Validate and Package Repository Structure
         run: |
           echo "Verifying extension requirements..."
           
-          # Ensure directory structure exists
+          # Ensure required file structures exist
           if [ ! -d "plugins/flystream" ]; then
             echo "Error: Directory 'plugins/flystream' not found."
             exit 1
@@ -45,7 +44,7 @@ jobs:
             exit 1
           fi
 
-          # Automatically verify or build index.json dynamically
+          # Dynamically enforce/build index.json registry
           cat << 'EOF' > index.json
           {
             "name": "Custom Provider Repository",
@@ -63,11 +62,11 @@ jobs:
           
           echo "Repository package validation completed successfully."
 
-      - name: Upload Build Artifacts
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload Pages Package Artifact
+        uses: [actions/upload-pages-artifact@v3](https://github.com/actions/upload-pages-artifact "upload-pages-artifact")
         with:
           path: '.'
 
-      - name: Deploy static assets to GitHub Pages
+      - name: Deploy to GitHub Pages Engines
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: [actions/deploy-pages@v4](https://github.com/actions/deploy-pages "deploy-pages")
