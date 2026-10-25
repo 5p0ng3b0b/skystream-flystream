@@ -6,11 +6,12 @@ on:
       - main
   workflow_dispatch:
 
-# Explicit permissions required for GitHub Pages deployments via Actions
+# Added 'actions: read' permission to resolve the HttpError 403 failure
 permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read
 
 concurrency:
   group: "pages"
@@ -63,10 +64,10 @@ jobs:
           echo "Repository package validation completed successfully."
 
       - name: Upload Pages Package Artifact
-        uses: [actions/upload-pages-artifact@v3](https://github.com/actions/upload-pages-artifact "upload-pages-artifact")
+        uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
 
       - name: Deploy to GitHub Pages Engines
         id: deployment
-        uses: [actions/deploy-pages@v4](https://github.com/actions/deploy-pages "deploy-pages")
+        uses: actions/deploy-pages@v4
