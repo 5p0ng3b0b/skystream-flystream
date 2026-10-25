@@ -1,36 +1,57 @@
 /**
- * SkyStream Extension for FlyStream (flystream.net)
+ * SkyStream Extension for FlyStream (with Anti-Scraping / Challenge Bypass)
  */
 
 const FlyStream = {
     name: "FlyStream",
-    description: "Stream movies, TV shows, and anime from flystream.net",
+    description: "Stream movies, TV shows, and anime from flystream.net using native challenge rendering.",
     version: "1.0.0",
-    icon: "https://flystream.net", // Visual identifier fallback
+    icon: "https://flystream.net",
     baseUrl: "https://flystream.net",
 
     /**
+     * Executes requests through SkyStream's challenge_browser context
+     * to naturally render cookies, Cloudflare proofs, and JavaScript variables.
+     */
+    async fetchWithBypass(url) {
+        try {
+            // Uses SkyStream's native challenge engine instead of core http client
+            const options = {
+                method: "GET",
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5'
+                },
+                evaluateJs: "document.documentElement.outerHTML", // Returns the evaluated DOM tree
+                waitForSelector: "body" // Ensures Javascript execution environments are ready
+            };
+
+            const response = await challengeBrowser.execute(url, options);
+            if (!response || !response.result) {
+                throw new Error("Challenge browser validation failed or timed out.");
+            }
+            return response.result;
+        } catch (error) {
+            console.error("Bypass Failure: ", error);
+            return null;
+        }
+    },
+
+    /**
      * Search for movies, TV shows, or anime
-     * @param {string} query - The search string
-     * @returns {Promise<Array>} List of media objects
      */
     async search(query) {
         try {
-            // URL encoding the query for the FlyStream API/search route
             const searchUrl = `${this.baseUrl}/api/search?q=${encodeURIComponent(query)}`;
+            const htmlContent = await this.fetchWithBypass(searchUrl);
             
-            const response = await http.get(searchUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Referer': this.baseUrl
-                }
-            });
-
-            if (!response || !response.body) return [];
+            if (!htmlContent) return [];
             
-            const results = JSON.parse(response.body);
+            // If the endpoint yields pure JSON text inside the page context
+            const cleanJson = htmlContent.replace(/<[^>]*>/g, '').trim(); 
+            const results = JSON.parse(cleanJson);
             
-            // Map the FlyStream response schema to SkyStream's expected layout
             return results.map(item => ({
                 title: item.title || item.name,
                 url: `${this.baseUrl}/${item.media_type || 'movie'}/${item.id}`,
@@ -44,36 +65,27 @@ const FlyStream = {
     },
 
     /**
-     * Resolves the actual video streams for a specific title
-     * @param {string} url - The unique media URL generated in search
-     * @returns {Promise<Array>} List of stream links with qualities
+     * Resolves stream sources for media selections
      */
     async getStreams(url) {
         try {
-            // Extracts the internal media ID and type from the url
             const matches = url.match(/\/(movie|tv)\/([^/]+)/);
             if (!matches) return [];
 
             const [_, type, id] = matches;
             const providerUrl = `${this.baseUrl}/api/providers?id=${id}&type=${type}`;
+            const htmlContent = await this.fetchWithBypass(providerUrl);
 
-            const response = await http.get(providerUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Referer': url
-                }
-            });
+            if (!htmlContent) return [];
 
-            if (!response || !response.body) return [];
-
-            const providerData = JSON.parse(response.body);
+            const cleanJson = htmlContent.replace(/<[^>]*>/g, '').trim();
+            const providerData = JSON.parse(cleanJson);
             const streams = [];
 
-            // Iterate over FlyStream's third-party provider integrations
             if (providerData && providerData.sources) {
                 providerData.sources.forEach(source => {
                     streams.push({
-                        name: source.providerName || "FlyStream Mirror",
+                        name: source.providerName || "FlyStream Secure Mirror",
                         url: source.url,
                         quality: source.quality || "Auto",
                         isM3U8: source.url.includes(".m3u8")
@@ -89,5 +101,5 @@ const FlyStream = {
     }
 };
 
-// Register the provider with SkyStream's plugin interface
+// Register provider with SkyStream's JS engine runtime 
 registerProvider(FlyStream);
